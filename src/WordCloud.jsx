@@ -1,18 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 
 const getRandomColor = () => {
-  const colors = ['#FF6B6B', '#6BCB77', '#4D96FF', '#F7B801', '#A66DD4', '#FF922B'];
+  const colors = ['#FF6B6B', '#6BCB77', '#4D96FF', '#F7B801', '#A66DD4'];
   return colors[Math.floor(Math.random() * colors.length)];
-};
-
-// Check if two rectangles collide
-const isColliding = (a, b) => {
-  return !(
-    a.x + a.width < b.x ||
-    a.x > b.x + b.width ||
-    a.y + a.height < b.y ||
-    a.y > b.y + b.height
-  );
 };
 
 const WordCloud = ({ data }) => {
@@ -20,6 +10,15 @@ const WordCloud = ({ data }) => {
   const [hoveredWord, setHoveredWord] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const positions = useRef([]);
+
+  // Static positions for 5 bubbles (x, y, radius multiplier)
+  const staticPositions = [
+    { x: 0.4, y: 0.5, radius: 1.0 },
+    { x: 0.6, y: 0.5, radius: 0.9 },
+    { x: 0.5, y: 0.4, radius: 0.8 },
+    { x: 0.3, y: 0.6, radius: 0.7 },
+    { x: 0.7, y: 0.6, radius: 0.6 }
+  ];
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -29,51 +28,45 @@ const WordCloud = ({ data }) => {
     ctx.clearRect(0, 0, width, height);
     positions.current = [];
 
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    data.forEach((item, index) => {
-      const fontSize = item.size;
+    data.slice(0, 5).forEach((item, index) => {
+      const position = staticPositions[index % staticPositions.length];
+      const fontSize = item.size * 1.5; // Increase font size for bubble effect
       const color = getRandomColor();
-      ctx.font = `${fontSize}px 'Segoe UI', sans-serif`;
-      const textWidth = ctx.measureText(item.word).width;
-      const textHeight = fontSize;
+      const text = item.word;
+      
+      // Calculate position based on static positions
+      const x = width * position.x;
+      const y = height * position.y;
+      const bubbleRadius = fontSize * position.radius * 1.5;
 
-      // Try placing on a spiral path until a non-colliding spot is found
-      let angle = 0;
-      let radius = 0;
-      let placed = false;
-      let x, y;
+      // Draw bubble
+      ctx.beginPath();
+      ctx.arc(x, y, bubbleRadius, 0, Math.PI * 2);
+      ctx.fillStyle = color + '80'; // Add transparency
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-      while (!placed && radius < 300) {
-        angle += 0.3;
-        radius += 2;
+      // Draw text
+      ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y);
 
-        x = centerX + radius * Math.cos(angle) - textWidth / 2;
-        y = centerY + radius * Math.sin(angle) - textHeight / 2;
-
-        const newBox = { x, y, width: textWidth, height: textHeight };
-
-        const collision = positions.current.some(pos => isColliding(pos, newBox));
-
-        if (!collision) {
-          ctx.fillStyle = color;
-          ctx.shadowColor = 'rgba(0,0,0,0.2)';
-          ctx.shadowBlur = 2;
-          ctx.fillText(item.word, x, y + fontSize);
-
-          positions.current.push({
-            ...item,
-            x,
-            y,
-            width: textWidth,
-            height: textHeight,
-            color,
-          });
-
-          placed = true;
-        }
-      }
+      // Save position for hover detection
+      positions.current.push({
+        ...item,
+        x: x - bubbleRadius,
+        y: y - bubbleRadius,
+        width: bubbleRadius * 2,
+        height: bubbleRadius * 2,
+        color,
+        centerX: x,
+        centerY: y,
+        radius: bubbleRadius
+      });
     });
   }, [data]);
 
@@ -87,18 +80,29 @@ const WordCloud = ({ data }) => {
 
     let found = false;
 
+    // Redraw all bubbles
     positions.current.forEach((item) => {
-      const isHovered =
-        x >= item.x &&
-        x <= item.x + item.width &&
-        y >= item.y &&
-        y <= item.y + item.height;
+      const distance = Math.sqrt(
+        Math.pow(x - item.centerX, 2) + 
+        Math.pow(y - item.centerY, 2)
+      );
+      const isHovered = distance <= item.radius;
 
-      ctx.font = `${item.size}px 'Segoe UI', sans-serif`;
-      ctx.fillStyle = isHovered ? '#222' : item.color;
-      ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = isHovered ? 5 : 2;
-      ctx.fillText(item.word, item.x, item.y + item.size);
+      // Draw bubble
+      ctx.beginPath();
+      ctx.arc(item.centerX, item.centerY, item.radius, 0, Math.PI * 2);
+      ctx.fillStyle = isHovered ? `${item.color}CC` : `${item.color}80`;
+      ctx.fill();
+      ctx.strokeStyle = item.color;
+      ctx.lineWidth = isHovered ? 3 : 2;
+      ctx.stroke();
+
+      // Draw text
+      ctx.font = `bold ${item.size * 1.5}px 'Segoe UI', sans-serif`;
+      ctx.fillStyle = isHovered ? '#fff' : '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.word, item.centerX, item.centerY);
 
       if (isHovered && !found) {
         found = true;
@@ -130,7 +134,7 @@ const WordCloud = ({ data }) => {
           top: tooltipPos.y + 10,
           left: tooltipPos.x + 10,
           backgroundColor: '#fff',
-          border: '1px solid #ddd',
+          border: `2px solid ${hoveredWord.color}`,
           padding: '10px 14px',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',

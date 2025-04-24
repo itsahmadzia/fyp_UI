@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import WordCloud from './WordCloud';
 import SemanticEmotionUI from './Sentiment';
+import UsingLibrary from '../UsingLibrary';
+import AnalyticsDashboard from './DifferentCHarts';
 
 
 function App() {
@@ -17,8 +19,10 @@ function App() {
   {/* <WordCloud data={data}>
 
 
-  </WordCloud> */}
+  </WordCloud>
   <SemanticEmotionUI></SemanticEmotionUI>
+  <UsingLibrary></UsingLibrary> */}
+<AnalyticsDashboard/>
     </>
   )
 }
